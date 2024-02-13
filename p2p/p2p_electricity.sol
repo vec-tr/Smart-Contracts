@@ -54,7 +54,7 @@ contract P2PElectricity {
 
                         GridData[gridId].buyReqs.push(BuyReq({
                             buyerAccountAddr: AccountAddress,
-                            unitsRequired: 0,
+                            unitsRequired: Units,
                             unitsFulfilled: unitsReq,
                             buyPrice: gridRecord.sellReqs[numReq].sellPrice
                         }));
@@ -87,10 +87,10 @@ contract P2PElectricity {
 
         if (gridRecord.buyReqs.length > 0) {
             for (uint numReq = 0; numReq < gridRecord.buyReqs.length; numReq++) {
-                if (gridRecord.buyReqs[numReq].buyPrice >= price && gridRecord.buyReqs[numReq].unitsRequired > 0) {
-                    if (gridRecord.buyReqs[numReq].unitsRequired >= unitsAvail) {
+                if (gridRecord.buyReqs[numReq].buyPrice >= price && gridRecord.buyReqs[numReq].unitsFulfilled < gridRecord.buyReqs[numReq].unitsRequired) {
+                    if (gridRecord.buyReqs[numReq].unitsFulfilled >= unitsAvail) {
                         IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, unitsAvail);
-                        gridRecord.buyReqs[numReq].unitsRequired = gridRecord.buyReqs[numReq].unitsRequired - unitsAvail;
+                        gridRecord.buyReqs[numReq].unitsFulfilled = gridRecord.buyReqs[numReq].unitsFulfilled - unitsAvail;
 
                         GridData[gridId].sellReqs.push(SellReq({
                             sellerAccountAddr: AccountAddress,
@@ -102,9 +102,9 @@ contract P2PElectricity {
                         break;
 
                     } else {
-                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, gridRecord.buyReqs[numReq].unitsRequired);
+                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, gridRecord.buyReqs[numReq].unitsFulfilled);
                         unitsAvail = unitsAvail - gridRecord.buyReqs[numReq].unitsRequired;
-                        gridRecord.buyReqs[numReq].unitsRequired = 0;
+                        gridRecord.buyReqs[numReq].unitsFulfilled = gridRecord.buyReqs[numReq].unitsRequired;
                     }
                 }
             }
