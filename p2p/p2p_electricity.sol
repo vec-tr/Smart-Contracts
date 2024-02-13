@@ -10,16 +10,16 @@ contract P2PElectricity {
 
     struct BuyReq {
         address buyerAccountAddr;
-        uint qtyUnitsReq;
+        uint unitsRequired;
         uint buyPrice;
-        bool settled;
+        uint unitsFulfilled;
     }
 
     struct SellReq {
         address sellerAccountAddr;
-        uint qtyUnitsAvail;
+        uint unitsBid;
         uint sellPrice;
-        bool settled;
+        uint unitsAvailable;
     }
 
     struct GridRecord {
@@ -39,146 +39,84 @@ contract P2PElectricity {
         }));
     }
 
-    function Buy(address AccountAddress, uint units, string memory gridId, uint price) public {
+    function Buy(address AccountAddress, uint Units, string memory gridId, uint price) public {
         GridRecord memory gridRecord = GridData[gridId];
-        if (gridRecord.sellReqs.length > 0){
-            for (int count = int (gridRecord.sellReqs.length - 1); count >= 0; count-- ) {
-                uint numReq = uint(count);
-                if (gridRecord.sellReqs[numReq].qtyUnitsAvail >= units && gridRecord.sellReqs[numReq].sellPrice <= price) {
-                    IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, units);
-                    if (gridRecord.sellReqs[numReq].qtyUnitsAvail > units) {
-                        GridData[gridId].sellReqs.push(SellReq({
-                            sellerAccountAddr: gridRecord.sellReqs[numReq].sellerAccountAddr,
-                            qtyUnitsAvail: gridRecord.sellReqs[numReq].qtyUnitsAvail - units,
-                            sellPrice: gridRecord.sellReqs[numReq].sellPrice,
-                            settled: false
-                        }));
+        uint unitsReq = Units;
+        bool settled = false;
+        
+        if (gridRecord.sellReqs.length > 0) {
+            for (uint numReq = 0; numReq < gridRecord.sellReqs.length; numReq++ ) {
+                if (gridRecord.sellReqs[numReq].sellPrice <= price && gridRecord.sellReqs[numReq].unitsAvailable > 0) {
+                    if (gridRecord.sellReqs[numReq].unitsAvailable >= unitsReq) {
+                        
+                        IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, unitsReq);
+                        gridRecord.sellReqs[numReq].unitsAvailable = gridRecord.sellReqs[numReq].unitsAvailable - unitsReq;
 
-                         GridData[gridId].buyReqs.push(BuyReq({
-                            buyerAccountAddr: AccountAddress,
-                            qtyUnitsReq: 0,
-                            buyPrice: price,
-                            settled: true
-                        }));
-
-                    } else {
                         GridData[gridId].buyReqs.push(BuyReq({
                             buyerAccountAddr: AccountAddress,
-                            qtyUnitsReq: 0,
-                            buyPrice: price,
-                            settled: true
+                            unitsRequired: 0,
+                            unitsFulfilled: unitsReq,
+                            buyPrice: gridRecord.sellReqs[numReq].sellPrice
                         }));
-
-                        GridData[gridId].sellReqs.push(SellReq({
-                            sellerAccountAddr: gridRecord.sellReqs[numReq].sellerAccountAddr,
-                            qtyUnitsAvail: 0,
-                            sellPrice: gridRecord.sellReqs[numReq].sellPrice,
-                            settled: true
-                        }));
+                        settled = true;
+                        break;
+                    } else {
+                        IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, gridRecord.sellReqs[numReq].unitsAvailable);
+                        unitsReq = unitsReq - gridRecord.sellReqs[numReq].unitsAvailable;
+                        gridRecord.sellReqs[numReq].unitsAvailable = 0;
                     }
-                } else if(gridRecord.sellReqs[numReq].qtyUnitsAvail < units && gridRecord.sellReqs[numReq].sellPrice <= price) {
-                    IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, units);
-                    GridData[gridId].buyReqs.push(BuyReq({
-                        buyerAccountAddr: AccountAddress,
-                        qtyUnitsReq: units - gridRecord.sellReqs[numReq].qtyUnitsAvail,
-                        buyPrice: price,
-                        settled: false    
-                    }));
-
-                     GridData[gridId].sellReqs.push(SellReq({
-                        sellerAccountAddr: gridRecord.sellReqs[numReq].sellerAccountAddr,
-                        qtyUnitsAvail: 0,
-                        sellPrice: gridRecord.sellReqs[numReq].sellPrice,
-                        settled: true    
-                    }));
-
-                } else {
-                    GridData[gridId].buyReqs.push(BuyReq ({
-                        buyerAccountAddr: AccountAddress,
-                        qtyUnitsReq: units,
-                        buyPrice: price,
-                        settled: false
-                    }));
-                }
+                
+                } 
             }
-        } else {
+        }
+
+        if (settled == false) {
             GridData[gridId].buyReqs.push(BuyReq ({
                 buyerAccountAddr: AccountAddress,
-                qtyUnitsReq: units,
-                buyPrice: price,
-                settled: false
+                unitsRequired: Units,
+                unitsFulfilled: unitsReq,
+                buyPrice: price
             }));
         }
     }
 
-    function Sell(address AccountAddress, uint units, string memory gridId, uint price) public  {
+    function Sell(address AccountAddress, uint Units, string memory gridId, uint price) public  {
         GridRecord memory gridRecord = GridData[gridId];
+        uint unitsAvail = Units;
+        bool settled = false;
+
         if (gridRecord.buyReqs.length > 0) {
-            for (int count = int(gridRecord.buyReqs.length - 1); count >= 0; count--) {
-                uint numReq = uint(count);
-                if (gridRecord.buyReqs[numReq].qtyUnitsReq <= units && gridRecord.buyReqs[numReq].buyPrice >= price) {
-                    IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, gridRecord.buyReqs[numReq].qtyUnitsReq);
-                    if (units > gridRecord.buyReqs[numReq].qtyUnitsReq) {
+            for (uint numReq = 0; numReq < gridRecord.buyReqs.length; numReq++) {
+                if (gridRecord.buyReqs[numReq].buyPrice >= price && gridRecord.buyReqs[numReq].unitsRequired > 0) {
+                    if (gridRecord.buyReqs[numReq].unitsRequired >= unitsAvail) {
+                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, unitsAvail);
+                        gridRecord.buyReqs[numReq].unitsRequired = gridRecord.buyReqs[numReq].unitsRequired - unitsAvail;
+
                         GridData[gridId].sellReqs.push(SellReq({
                             sellerAccountAddr: AccountAddress,
-                            qtyUnitsAvail: units - gridRecord.buyReqs[numReq].qtyUnitsReq,
-                            sellPrice: price,
-                            settled: false
+                            unitsBid: Units,
+                            unitsAvailable: 0,
+                            sellPrice: gridRecord.buyReqs[numReq].buyPrice
                         }));
-                        GridData[gridId].buyReqs.push(BuyReq({
-                            buyerAccountAddr: gridRecord.buyReqs[numReq].buyerAccountAddr,
-                            qtyUnitsReq: 0,
-                            buyPrice: gridRecord.buyReqs[numReq].buyPrice,
-                            settled: true
-                        }));
+                        settled = true;
+                        break;
 
                     } else {
-                        GridData[gridId].buyReqs.push(BuyReq({
-                            buyerAccountAddr: gridRecord.buyReqs[numReq].buyerAccountAddr,
-                            qtyUnitsReq: 0,
-                            buyPrice: gridRecord.buyReqs[numReq].buyPrice,
-                            settled: true
-                        }));
-
-                        GridData[gridId].sellReqs.push(SellReq({
-                            sellerAccountAddr: AccountAddress,
-                            qtyUnitsAvail: 0,
-                            sellPrice: price,
-                            settled: true
-                        }));
+                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, gridRecord.buyReqs[numReq].unitsRequired);
+                        unitsAvail = unitsAvail - gridRecord.buyReqs[numReq].unitsRequired;
+                        gridRecord.buyReqs[numReq].unitsRequired = 0;
                     }
-                } else if (gridRecord.buyReqs[numReq].qtyUnitsReq > units && gridRecord.buyReqs[numReq].buyPrice >= price) {
-                    IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, units);
-                    GridData[gridId].buyReqs.push(BuyReq({
-                            buyerAccountAddr: gridRecord.buyReqs[numReq].buyerAccountAddr,
-                            qtyUnitsReq: gridRecord.buyReqs[numReq].qtyUnitsReq - units,
-                            buyPrice: gridRecord.buyReqs[numReq].buyPrice,
-                            settled: false
-                        }));
-
-                    GridData[gridId].sellReqs.push(SellReq({
-                            sellerAccountAddr: AccountAddress,
-                            qtyUnitsAvail: 0,
-                            sellPrice: price,
-                            settled: true
-                        }));
-                } else {
-                    GridData[gridId].sellReqs.push(SellReq({
-                        sellerAccountAddr: AccountAddress,
-                        qtyUnitsAvail: units,
-                        sellPrice: price,
-                        settled: false
-                    }));
                 }
-
             }
             
-        } else {
+        }
+        
+        if (settled == false) {
             GridData[gridId].sellReqs.push(SellReq({
                 sellerAccountAddr: AccountAddress,
-                qtyUnitsAvail: units,
-                sellPrice: price,
-                settled: false
+                unitsBid: Units,
+                unitsAvailable: unitsAvail,
+                sellPrice: price
             }));
         }
     }
