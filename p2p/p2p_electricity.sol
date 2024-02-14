@@ -40,30 +40,32 @@ contract P2PElectricity {
     }
 
     function Buy(address AccountAddress, uint Units, string memory gridId, uint price) public {
-        GridRecord memory gridRecord = GridData[gridId];
-        uint unitsReq = Units;
+        uint unitsReq = Units; 
+        uint unitsFulfilled = 0;
         bool settled = false;
         
-        if (gridRecord.sellReqs.length > 0) {
-            for (uint numReq = 0; numReq < gridRecord.sellReqs.length; numReq++ ) {
-                if (gridRecord.sellReqs[numReq].sellPrice <= price && gridRecord.sellReqs[numReq].unitsAvailable > 0) {
-                    if (gridRecord.sellReqs[numReq].unitsAvailable >= unitsReq) {
+        if (GridData[gridId].sellReqs.length > 0) {
+            for (uint numReq = 0; numReq < GridData[gridId].sellReqs.length; numReq++ ) {
+                if (GridData[gridId].sellReqs[numReq].sellPrice <= price && GridData[gridId].sellReqs[numReq].unitsAvailable > 0) {
+                    if (GridData[gridId].sellReqs[numReq].unitsAvailable >= unitsReq) {
                         
-                        IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, unitsReq);
-                        gridRecord.sellReqs[numReq].unitsAvailable = gridRecord.sellReqs[numReq].unitsAvailable - unitsReq;
+                        IssueSettlement(GridData[gridId].sellReqs[numReq].sellerAccountAddr, AccountAddress, unitsReq);
+                        GridData[gridId].sellReqs[numReq].unitsAvailable = GridData[gridId].sellReqs[numReq].unitsAvailable - unitsReq;
 
                         GridData[gridId].buyReqs.push(BuyReq({
                             buyerAccountAddr: AccountAddress,
                             unitsRequired: Units,
                             unitsFulfilled: unitsReq,
-                            buyPrice: gridRecord.sellReqs[numReq].sellPrice
+                            buyPrice: GridData[gridId].sellReqs[numReq].sellPrice
                         }));
+                        
                         settled = true;
                         break;
                     } else {
-                        IssueSettlement(gridRecord.sellReqs[numReq].sellerAccountAddr, AccountAddress, gridRecord.sellReqs[numReq].unitsAvailable);
-                        unitsReq = unitsReq - gridRecord.sellReqs[numReq].unitsAvailable;
-                        gridRecord.sellReqs[numReq].unitsAvailable = 0;
+                        IssueSettlement(GridData[gridId].sellReqs[numReq].sellerAccountAddr, AccountAddress, GridData[gridId].sellReqs[numReq].unitsAvailable);
+                        unitsReq = unitsReq - GridData[gridId].sellReqs[numReq].unitsAvailable;
+                        unitsFulfilled += GridData[gridId].sellReqs[numReq].unitsAvailable;
+                        GridData[gridId].sellReqs[numReq].unitsAvailable = 0;
                     }
                 
                 } 
@@ -74,37 +76,36 @@ contract P2PElectricity {
             GridData[gridId].buyReqs.push(BuyReq ({
                 buyerAccountAddr: AccountAddress,
                 unitsRequired: Units,
-                unitsFulfilled: unitsReq,
+                unitsFulfilled: unitsFulfilled,
                 buyPrice: price
             }));
         }
     }
 
     function Sell(address AccountAddress, uint Units, string memory gridId, uint price) public  {
-        GridRecord memory gridRecord = GridData[gridId];
         uint unitsAvail = Units;
         bool settled = false;
 
-        if (gridRecord.buyReqs.length > 0) {
-            for (uint numReq = 0; numReq < gridRecord.buyReqs.length; numReq++) {
-                if (gridRecord.buyReqs[numReq].buyPrice >= price && gridRecord.buyReqs[numReq].unitsFulfilled < gridRecord.buyReqs[numReq].unitsRequired) {
-                    if (gridRecord.buyReqs[numReq].unitsFulfilled >= unitsAvail) {
-                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, unitsAvail);
-                        gridRecord.buyReqs[numReq].unitsFulfilled = gridRecord.buyReqs[numReq].unitsFulfilled - unitsAvail;
+        if (GridData[gridId].buyReqs.length > 0) {
+            for (uint numReq = 0; numReq < GridData[gridId].buyReqs.length; numReq++) {
+                if (GridData[gridId].buyReqs[numReq].buyPrice >= price && GridData[gridId].buyReqs[numReq].unitsFulfilled < GridData[gridId].buyReqs[numReq].unitsRequired) {
+                    if (GridData[gridId].buyReqs[numReq].unitsFulfilled >= unitsAvail) {
+                        IssueSettlement(AccountAddress, GridData[gridId].buyReqs[numReq].buyerAccountAddr, unitsAvail);
+                        GridData[gridId].buyReqs[numReq].unitsFulfilled = GridData[gridId].buyReqs[numReq].unitsFulfilled - unitsAvail;
 
                         GridData[gridId].sellReqs.push(SellReq({
                             sellerAccountAddr: AccountAddress,
                             unitsBid: Units,
                             unitsAvailable: 0,
-                            sellPrice: gridRecord.buyReqs[numReq].buyPrice
+                            sellPrice: GridData[gridId].buyReqs[numReq].buyPrice
                         }));
                         settled = true;
                         break;
 
                     } else {
-                        IssueSettlement(AccountAddress, gridRecord.buyReqs[numReq].buyerAccountAddr, gridRecord.buyReqs[numReq].unitsFulfilled);
-                        unitsAvail = unitsAvail - gridRecord.buyReqs[numReq].unitsRequired;
-                        gridRecord.buyReqs[numReq].unitsFulfilled = gridRecord.buyReqs[numReq].unitsRequired;
+                        IssueSettlement(AccountAddress, GridData[gridId].buyReqs[numReq].buyerAccountAddr, GridData[gridId].buyReqs[numReq].unitsFulfilled);
+                        unitsAvail = unitsAvail - GridData[gridId].buyReqs[numReq].unitsRequired;
+                        GridData[gridId].buyReqs[numReq].unitsFulfilled = GridData[gridId].buyReqs[numReq].unitsRequired;
                     }
                 }
             }
