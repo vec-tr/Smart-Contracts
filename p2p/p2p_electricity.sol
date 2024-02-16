@@ -103,7 +103,7 @@ contract P2PElectricity {
                         break;
 
                     } else {
-                        IssueSettlement(AccountAddress, GridData[gridId].buyReqs[numReq].buyerAccountAddr, GridData[gridId].buyReqs[numReq].unitsFulfilled);
+                        IssueSettlement(AccountAddress, GridData[gridId].buyReqs[numReq].buyerAccountAddr, GridData[gridId].buyReqs[numReq].unitsRequired - GridData[gridId].buyReqs[numReq].unitsFulfilled);
                         unitsAvail = unitsAvail - GridData[gridId].buyReqs[numReq].unitsRequired;
                         GridData[gridId].buyReqs[numReq].unitsFulfilled = GridData[gridId].buyReqs[numReq].unitsRequired;
                     }
@@ -133,4 +133,5 @@ contract P2PElectricity {
     function SettledTx() public view returns(RecordSettlement[] memory) {
         return settlements;
     }
+
 }
